@@ -30,7 +30,7 @@ jobs:
         run: |
           pytest tests/test_box.py tests/test_state.py tests/test_topology.py \
                  tests/test_forcefields.py tests/test_integrators.py \
-                 tests/test_neighborlist.py \
+                 tests/test_neighborlists.py \
                  -v --tb=short
 
   # ============================================
