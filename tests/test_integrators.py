@@ -163,17 +163,21 @@ class TestVelocityVerletIntegrator:
         rel_fluctuation = np.std(energies) / np.mean(energies)
         assert rel_fluctuation < 0.001, f"Energy fluctuation {rel_fluctuation} too high"
 
-    def test_leapfrog_initialization(self, harmonic_state, simple_force):
-        """Test that leapfrog properly initializes half-step velocity."""
+    def test_stateless_integrator(self, harmonic_state, simple_force):
+        """Test that integrator is stateless and deterministic."""
         integrator = VelocityVerletIntegrator(dt=0.001)
 
-        # First step should initialize v(t - dt/2)
+        # First run
         state1 = integrator.step(harmonic_state, simple_force)
-        assert integrator._velocities_half is not None
-
-        # Second step should use stored half-step velocity
         state2 = integrator.step(state1, simple_force)
-        assert state2.step == 2
+
+        # Second run with same inputs should give identical results
+        state1_again = integrator.step(harmonic_state, simple_force)
+        state2_again = integrator.step(state1_again, simple_force)
+
+        # Should be exactly equal (stateless = deterministic)
+        np.testing.assert_array_equal(state2.positions, state2_again.positions)
+        np.testing.assert_array_equal(state2.velocities, state2_again.velocities)
 
     def test_symplecticity_phase_space_volume(self):
         """Test symplectic property by checking phase space volume conservation."""
