@@ -121,7 +121,7 @@ def lj_fluid(
     density: float = 0.5,
     n_steps: int = 1000,
     n_equil: int = 500,
-    timestep: float = 0.001,
+    timestep: float = 0.0005,
     cutoff: float = 2.5,
     seed: int = 42,
     verbose: bool = True,

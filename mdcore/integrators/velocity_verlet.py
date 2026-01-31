@@ -15,24 +15,23 @@ if TYPE_CHECKING:
 
 class VelocityVerletIntegrator(Integrator):
     """
-    Velocity Verlet integrator (Störmer-Verlet).
+    Velocity Verlet integrator (Störmer-Verlet formulation).
 
-    The standard symplectic integrator for molecular dynamics.
-    Time-reversible and preserves phase space volume.
+    A symplectic, time-reversible integrator for molecular dynamics.
 
     Algorithm:
         r(t + dt) = r(t) + dt * v(t) + 0.5 * dt² * a(t)
         v(t + dt) = v(t) + dt * a(t)
 
-    This is the position-first Störmer-Verlet formulation. It is:
-    - Symplectic (preserves phase space volume)
-    - Time-reversible (negate v, step, negate v → return to start)
+    Properties:
+    - Symplectic: preserves phase space volume
+    - Time-reversible: negate v, step, negate v returns to start
     - Second-order accurate in positions
-    - First-order accurate in velocities (but energy still conserved)
-    - Stateless (no internal state between steps)
+    - Deterministic: no internal state, same inputs = same outputs
 
-    For higher velocity accuracy, use with force computation at new
-    positions to complete the velocity update externally.
+    For best energy conservation, use small timesteps (dt ≈ 0.001 τ
+    for LJ systems, or dt such that dt*ω_max < 0.1 where ω_max is
+    the highest frequency in the system).
 
     Attributes:
         dt: Integration timestep.
@@ -56,10 +55,6 @@ class VelocityVerletIntegrator(Integrator):
         """
         Perform one Velocity Verlet integration step.
 
-        This is a stateless implementation that guarantees:
-        - Determinism: same inputs always produce same outputs
-        - Time-reversibility: negate velocities and step backward returns to start
-
         Args:
             state: Current MD state.
             forces: Forces at CURRENT positions, shape (N, 3).
@@ -71,7 +66,7 @@ class VelocityVerletIntegrator(Integrator):
         masses = state.masses[:, np.newaxis]  # Shape (N, 1) for broadcasting
         accel = forces / masses
 
-        # Störmer-Verlet (position-first):
+        # Störmer-Verlet update (position-first, symplectic, time-reversible):
         # r(t + dt) = r(t) + dt * v(t) + 0.5 * dt² * a(t)
         # v(t + dt) = v(t) + dt * a(t)
         positions_new = state.positions + dt * state.velocities + 0.5 * dt * dt * accel
@@ -92,7 +87,7 @@ class VelocityVerletIntegrator(Integrator):
         return new_state
 
     def reset(self) -> None:
-        """Reset integrator state (no-op for stateless integrator)."""
+        """Reset integrator state (no-op, integrator is stateless)."""
         pass
 
 
