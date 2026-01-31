@@ -1,0 +1,33 @@
+{
+    "version": "1.0.0",
+    "generated": "2026-01-31",
+    "platform": "cpu_serial",
+    "note": "Baselines for pure Python implementation (no JIT/GPU)",
+    "benchmarks": {
+        "lj_64_atoms": {
+            "steps_per_second": 15.0,
+            "tolerance": 0.30,
+            "description": "64-atom LJ NVE simulation"
+        },
+        "lj_256_atoms": {
+            "steps_per_second": 3.0,
+            "tolerance": 0.30,
+            "description": "256-atom LJ NVE simulation"
+        },
+        "lj_1000_atoms": {
+            "steps_per_second": 0.5,
+            "tolerance": 0.30,
+            "description": "1000-atom LJ NVE simulation"
+        },
+        "neighbor_list_build": {
+            "builds_per_second": 100.0,
+            "tolerance": 0.30,
+            "description": "Neighbor list construction"
+        },
+        "force_evaluation": {
+            "evaluations_per_second": 200.0,
+            "tolerance": 0.30,
+            "description": "LJ force evaluation only"
+        }
+    }
+}

@@ -91,6 +91,7 @@ ignore = [
     "ARG001", # unused function argument (common in ABC methods)
     "ARG002", # unused method argument
     "PIE790", # unnecessary ellipsis (we use ... in abstract methods intentionally)
+    "B007",   # function call in default argument
 ]
 
 [tool.ruff.lint.per-file-ignores]

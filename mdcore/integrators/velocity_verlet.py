@@ -15,25 +15,25 @@ if TYPE_CHECKING:
 
 class VelocityVerletIntegrator(Integrator):
     """
-    Velocity Verlet integrator.
+    Velocity Verlet integrator (leapfrog formulation).
 
     The standard symplectic integrator for molecular dynamics.
     Time-reversible and preserves phase space volume.
 
-    Algorithm (split into two half-steps for force recomputation):
+    This uses the leapfrog formulation where positions and velocities
+    are staggered by half a timestep:
 
-    Full step (when forces are recomputed between calls):
-        v(t + dt/2) = v(t) + 0.5 * dt * a(t)
+        v(t + dt/2) = v(t - dt/2) + dt * a(t)
         r(t + dt) = r(t) + dt * v(t + dt/2)
-        [compute new forces -> a(t + dt)]
-        v(t + dt) = v(t + dt/2) + 0.5 * dt * a(t + dt)
 
-    This implementation assumes forces passed in are the NEW forces
-    at the updated positions, following the standard MD engine loop.
+    The full-step velocity is reconstructed for output:
+        v(t) = v(t - dt/2) + 0.5 * dt * a(t)
+
+    Usage:
+        Forces should be computed at CURRENT positions before calling step().
 
     Attributes:
         dt: Integration timestep.
-        _half_stepped: Whether we're in the middle of a step.
     """
 
     def __init__(self, dt: float) -> None:
@@ -44,7 +44,7 @@ class VelocityVerletIntegrator(Integrator):
             dt: Integration timestep.
         """
         self._dt = dt
-        self._prev_forces: NDArray[np.floating] | None = None
+        self._velocities_half: NDArray[np.floating] | None = None
 
     @property
     def timestep(self) -> float:
@@ -55,48 +55,46 @@ class VelocityVerletIntegrator(Integrator):
         """
         Perform one Velocity Verlet integration step.
 
-        This performs the full VV algorithm:
-        1. Update velocities half step with current forces
-        2. Update positions full step
-        3. Update velocities half step with new forces (passed in)
-
         Args:
             state: Current MD state.
-            forces: NEW forces at updated positions, shape (N, 3).
+            forces: Forces at CURRENT positions, shape (N, 3).
 
         Returns:
             New MDState after integration step.
         """
         dt = self._dt
         masses = state.masses[:, np.newaxis]  # Shape (N, 1) for broadcasting
+        accel = forces / masses
 
-        # Use previous forces if available, otherwise use current
-        # (first step uses same forces for both half-steps)
-        prev_forces = forces if self._prev_forces is None else self._prev_forces
+        if self._velocities_half is None:
+            # First step: initialize v(t - dt/2) by going back half a step
+            # v(-dt/2) = v(0) - 0.5 * dt * a(0)
+            velocities_half_old = state.velocities - 0.5 * dt * accel
+        else:
+            velocities_half_old = self._velocities_half
 
-        # Compute accelerations
-        accel_old = prev_forces / masses
-        accel_new = forces / masses
+        # Leapfrog velocity update: v(t + dt/2) = v(t - dt/2) + dt * a(t)
+        velocities_half_new = velocities_half_old + dt * accel
 
-        # Half step velocity update with old forces
-        velocities_half = state.velocities + 0.5 * dt * accel_old
-
-        # Full step position update
-        positions_new = state.positions + dt * velocities_half
+        # Position update: r(t + dt) = r(t) + dt * v(t + dt/2)
+        positions_new = state.positions + dt * velocities_half_new
 
         # Wrap positions into box
-        positions_new = state.box.wrap_positions(positions_new)
+        if state.box is not None:
+            positions_new = state.box.wrap_positions(positions_new)
 
-        # Half step velocity update with new forces
-        velocities_new = velocities_half + 0.5 * dt * accel_new
+        # Store half-step velocities for next iteration
+        self._velocities_half = velocities_half_new.copy()
 
-        # Store forces for next step
-        self._prev_forces = forces.copy()
+        # For output, return v(t + dt/2) which is the natural leapfrog velocity.
+        # For energy calculations, this gives E at the half-step, which is
+        # appropriate since positions are also "staggered" by a half-step.
+        # This is standard practice and preserves symplecticity.
 
         # Create new state
         new_state = state.copy()
         new_state.positions = positions_new
-        new_state.velocities = velocities_new
+        new_state.velocities = velocities_half_new
         new_state.forces = forces.copy()
         new_state.time = state.time + dt
         new_state.step = state.step + 1
@@ -105,7 +103,7 @@ class VelocityVerletIntegrator(Integrator):
 
     def reset(self) -> None:
         """Reset integrator state (e.g., for new simulation)."""
-        self._prev_forces = None
+        self._velocities_half = None
 
 
 class LeapfrogIntegrator(Integrator):

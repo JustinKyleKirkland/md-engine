@@ -1,0 +1,27 @@
+{
+    "version": "1.0.0",
+    "generated": "2026-01-31",
+    "platform": "ml",
+    "benchmarks": {
+        "ml_inference_100_atoms": {
+            "inferences_per_second": 100.0,
+            "tolerance": 0.20,
+            "description": "ML potential inference speed"
+        },
+        "ml_md_100_atoms": {
+            "steps_per_second": 50.0,
+            "tolerance": 0.20,
+            "description": "ML MD simulation speed"
+        }
+    },
+    "accuracy_gates": {
+        "force_mae_ev_angstrom": {
+            "max_value": 0.05,
+            "description": "Maximum force MAE in eV/Å"
+        },
+        "energy_mae_mev_atom": {
+            "max_value": 1.0,
+            "description": "Maximum energy MAE in meV/atom"
+        }
+    }
+}

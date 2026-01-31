@@ -1,0 +1,22 @@
+{
+    "version": "1.0.0",
+    "generated": "2026-01-31",
+    "platform": "cpu_mpi",
+    "n_ranks": 4,
+    "benchmarks": {
+        "lj_1000_atoms_4rank": {
+            "steps_per_second": 60.0,
+            "tolerance": 0.20,
+            "description": "1000-atom LJ with 4 MPI ranks"
+        },
+        "lj_4000_atoms_4rank": {
+            "steps_per_second": 15.0,
+            "tolerance": 0.20,
+            "description": "4000-atom LJ with 4 MPI ranks"
+        },
+        "scaling_efficiency": {
+            "min_efficiency": 0.70,
+            "description": "Parallel efficiency (speedup / n_ranks)"
+        }
+    }
+}

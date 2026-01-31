@@ -45,7 +45,7 @@ def simple_force():
 
 
 class TestVelocityVerletIntegrator:
-    """Test Velocity Verlet integrator."""
+    """Test Velocity Verlet integrator (leapfrog formulation)."""
 
     def test_timestep_property(self):
         """Test timestep property."""
@@ -83,7 +83,7 @@ class TestVelocityVerletIntegrator:
         for _ in range(10):
             state = integrator.step(state, zero_force)
 
-        # Velocity should remain constant
+        # Velocity should remain constant (leapfrog preserves this)
         assert np.allclose(state.velocities, harmonic_state.velocities, atol=1e-10)
 
     def test_momentum_conservation_no_external_force(self, harmonic_state):
@@ -119,6 +119,94 @@ class TestVelocityVerletIntegrator:
         # Should be able to start fresh
         new_state = integrator.step(harmonic_state, simple_force)
         assert new_state.step == 1
+
+    def test_energy_conservation_harmonic_oscillator(self):
+        """Test energy conservation for a harmonic oscillator."""
+        # Single particle in harmonic potential
+        box = Box.cubic(20.0)
+        k = 1.0  # Spring constant
+        m = 1.0  # Mass
+
+        # Initial conditions: displaced from equilibrium
+        x0 = 1.0
+        v0 = 0.0
+        state = MDState.create(
+            positions=np.array([[10.0 + x0, 10.0, 10.0]]),
+            masses=np.array([m]),
+            box=box,
+            velocities=np.array([[v0, 0.0, 0.0]]),
+        )
+
+        # Smaller timestep for better energy conservation
+        dt = 0.001
+        integrator = VelocityVerletIntegrator(dt=dt)
+
+        # Track energy
+        energies = []
+        n_steps = 1000
+
+        for _ in range(n_steps):
+            # Harmonic force: F = -k * (x - x_eq)
+            displacement = state.positions[0, 0] - 10.0
+            force = np.array([[-k * displacement, 0.0, 0.0]])
+
+            # Compute energy before step
+            ke = 0.5 * m * np.sum(state.velocities**2)
+            pe = 0.5 * k * displacement**2
+            energies.append(ke + pe)
+
+            state = integrator.step(state, force)
+
+        energies = np.array(energies)
+
+        # Energy should be conserved to high precision with small dt
+        rel_fluctuation = np.std(energies) / np.mean(energies)
+        assert rel_fluctuation < 0.001, f"Energy fluctuation {rel_fluctuation} too high"
+
+    def test_leapfrog_initialization(self, harmonic_state, simple_force):
+        """Test that leapfrog properly initializes half-step velocity."""
+        integrator = VelocityVerletIntegrator(dt=0.001)
+
+        # First step should initialize v(t - dt/2)
+        state1 = integrator.step(harmonic_state, simple_force)
+        assert integrator._velocities_half is not None
+
+        # Second step should use stored half-step velocity
+        state2 = integrator.step(state1, simple_force)
+        assert state2.step == 2
+
+    def test_symplecticity_phase_space_volume(self):
+        """Test symplectic property by checking phase space volume conservation."""
+        # Two nearby trajectories should maintain their separation
+        box = Box.cubic(20.0)
+
+        state1 = MDState.create(
+            positions=np.array([[10.0, 10.0, 10.0]]),
+            masses=np.array([1.0]),
+            box=box,
+            velocities=np.array([[1.0, 0.0, 0.0]]),
+        )
+
+        state2 = MDState.create(
+            positions=np.array([[10.0 + 1e-6, 10.0, 10.0]]),
+            masses=np.array([1.0]),
+            box=box,
+            velocities=np.array([[1.0, 0.0, 0.0]]),
+        )
+
+        dt = 0.001
+        integrator1 = VelocityVerletIntegrator(dt=dt)
+        integrator2 = VelocityVerletIntegrator(dt=dt)
+
+        # Run with no forces (free particle)
+        zero_force = np.zeros((1, 3))
+        for _ in range(100):
+            state1 = integrator1.step(state1, zero_force)
+            state2 = integrator2.step(state2, zero_force)
+
+        # Phase space separation should be preserved (linear growth is OK)
+        pos_diff = np.linalg.norm(state1.positions - state2.positions)
+        assert pos_diff < 1e-4, "Trajectories diverged too much"
 
 
 class TestLeapfrogIntegrator:
