@@ -163,19 +163,22 @@ class TestVelocityVerletIntegrator:
         rel_fluctuation = np.std(energies) / np.mean(energies)
         assert rel_fluctuation < 0.001, f"Energy fluctuation {rel_fluctuation} too high"
 
-    def test_stateless_integrator(self, harmonic_state, simple_force):
-        """Test that integrator is stateless and deterministic."""
+    def test_deterministic_integrator(self, harmonic_state, simple_force):
+        """Test that integrator is deterministic when reset between runs."""
         integrator = VelocityVerletIntegrator(dt=0.001)
 
         # First run
         state1 = integrator.step(harmonic_state, simple_force)
         state2 = integrator.step(state1, simple_force)
 
+        # Reset integrator for second run
+        integrator.reset()
+
         # Second run with same inputs should give identical results
         state1_again = integrator.step(harmonic_state, simple_force)
         state2_again = integrator.step(state1_again, simple_force)
 
-        # Should be exactly equal (stateless = deterministic)
+        # Should be exactly equal after reset
         np.testing.assert_array_equal(state2.positions, state2_again.positions)
         np.testing.assert_array_equal(state2.velocities, state2_again.velocities)
 

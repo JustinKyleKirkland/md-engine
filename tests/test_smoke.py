@@ -173,6 +173,9 @@ class TestNVESmoke:
         """Test that simulation is deterministic with same seed."""
 
         def run_simulation(state):
+            # Reset integrator for fresh start
+            integrator.reset()
+
             positions = state.positions.copy()
             velocities = state.velocities.copy()
             masses = state.masses
@@ -196,7 +199,7 @@ class TestNVESmoke:
 
             return positions
 
-        # Run twice
+        # Run twice - both should give identical results with integrator reset
         final_pos_1 = run_simulation(small_lj_system)
         final_pos_2 = run_simulation(small_lj_system)
 
@@ -266,12 +269,25 @@ class TestIntegratorSmoke:
     def test_verlet_reversible(
         self, small_lj_system, lj_forcefield, neighbor_list, integrator
     ):
-        """Test that Verlet is time-reversible."""
+        """Test that Verlet is time-reversible using full_step (two force evals)."""
+
+        def force_fn(positions):
+            """Compute forces at given positions."""
+            temp_state = MDState(
+                positions=positions,
+                velocities=small_lj_system.velocities,
+                forces=np.zeros_like(positions),
+                masses=small_lj_system.masses,
+                box=small_lj_system.box,
+            )
+            neighbor_list.build(positions, small_lj_system.box)
+            return lj_forcefield.compute(temp_state, neighbor_list)
+
         neighbor_list.build(small_lj_system.positions, small_lj_system.box)
         forces = lj_forcefield.compute(small_lj_system, neighbor_list)
 
-        # Forward step
-        state_1 = integrator.step(small_lj_system, forces)
+        # Forward step with proper two-force-evaluation
+        state_1 = integrator.full_step(small_lj_system, forces, force_fn)
 
         # Reverse velocities
         state_1_reversed = MDState(
@@ -282,16 +298,16 @@ class TestIntegratorSmoke:
             box=state_1.box,
         )
 
-        # Backward step
+        # Backward step with proper two-force-evaluation
         neighbor_list.build(state_1_reversed.positions, state_1_reversed.box)
         forces_1 = lj_forcefield.compute(state_1_reversed, neighbor_list)
-        state_2 = integrator.step(state_1_reversed, forces_1)
+        state_2 = integrator.full_step(state_1_reversed, forces_1, force_fn)
 
         # Should return close to original (with reversed velocity)
         np.testing.assert_allclose(
             state_2.positions,
             small_lj_system.positions,
-            rtol=1e-5,
+            rtol=1e-10,  # Much tighter tolerance with proper VV
             err_msg="Verlet not time-reversible",
         )
 
